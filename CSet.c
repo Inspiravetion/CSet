@@ -35,6 +35,16 @@
 
 typedef struct _CSet CSet;*/
 
+//Global Declaration
+#define DEFAULT_CAPACITY 10
+
+//Internal Helper Declarations
+void CSet_Init_Empty(CSet* const pSet);
+bool CSet_Init_(CSet* const pSet, uint32_t Sz);
+bool Make_Initialized_Array(int32_t** arr, uint32_t Sz);
+bool Extend_CSet_Data_Array(CSet* pSet);
+void CSet_Insert_(CSet* pSet, int32_t val);
+
 /**
  * Initializes an empty pSet object, with capacity Sz.
  *
@@ -55,7 +65,15 @@ typedef struct _CSet CSet;*/
  * Returns:
  *    true if successful, false otherwise
  */
-bool CSet_Init(CSet* const pSet, uint32_t Sz);
+bool CSet_Init(CSet* const pSet, uint32_t Sz){
+	if(Sz == 0){
+		CSet_Init_Empty(pSet);
+		return true;
+	}
+	else{
+		return CSet_Init_(pSet, Sz);
+	}
+}; 
 
 /**
  * Loads specified values into a pSet object, replacing any previous contents.
@@ -78,7 +96,22 @@ bool CSet_Init(CSet* const pSet, uint32_t Sz);
  * Returns:
  *    true if successful, false otherwise
  */
-bool CSet_Load(CSet* const pSet, uint32_t Sz, const int32_t* const Data, uint32_t DSz);
+bool CSet_Load(CSet* const pSet, uint32_t Sz, const int32_t* const Data, uint32_t DSz){
+	int32_t* temp;
+	int i = 0;
+	bool success = Make_Initialized_Array(&temp, Sz);
+	if(!success){
+		return false;
+	}
+	pSet->Capacity = Sz;
+	pSet->Usage    = DSz;
+	pSet->Data     = temp;
+	while(i < DSz){
+		pSet->Data[i] = Data[i];
+		i++;
+	}
+	return true;
+};
 
 /**
  * Adds Value to a pSet object.
@@ -96,7 +129,31 @@ bool CSet_Load(CSet* const pSet, uint32_t Sz, const int32_t* const Data, uint32_
  * Returns:
  *    true if successful, false otherwise
  */
-bool CSet_Insert(CSet* const pSet, int32_t Value);
+bool CSet_Insert(CSet* const pSet, int32_t Value){
+	/**
+	 * MAKE SURE TO CHECK THAT THE VALUE IS NOT ALREADY IN THE SET!!!
+	 */
+	bool success;
+	if(!(pSet->Data)){
+		if((success = CSet_Init(pSet, DEFAULT_CAPACITY))){
+			CSet_Insert_(pSet, Value);
+			return true;
+		}
+		else{
+			return false;
+		}
+	}
+	else if((pSet->Usage) == (pSet->Capacity - 1)){
+		success = Extend_CSet_Data_Array(pSet);
+		if(success){
+			CSet_Insert_(pSet, Value);
+			return true;
+		}
+		return false;
+	}
+	CSet_Insert_(pSet, Value);
+	return true;
+};
 
 /**
  * Makes a deep copy of a CSet object.
@@ -289,4 +346,69 @@ bool CSet_isFull(const CSet* const pSet);
  *     *pSet satisfies the CSet contract
  */
 void CSet_makeEmpty(CSet* const pSet);
+
+
+//Internal(Private) helpers====================================================
+
+/**
+ * Initializes a Cset to be empty 
+ * @param pSet the passed in CSet to be altered
+ */
+void CSet_Init_Empty(CSet* const pSet){
+	pSet->Capacity = 0;
+	pSet->Usage    = 0;
+	pSet->Data     = NULL;
+};
+
+/**
+ * Initializes a CSet to have the given capacity of
+ * numbers in its Data array
+ * @param  pSet the passed in CSet
+ * @param  Sz   the size of the capacity
+ * @return bool whether or not the array allocation was successful
+ */
+bool CSet_Init_(CSet* const pSet, uint32_t Sz){
+	bool success = Make_Initialized_Array(&(pSet->Data), Sz);
+	if(!success){
+		return false;
+	}
+	pSet->Capacity = Sz;
+	pSet->Usage    = 0;
+	return true;
+};
+
+/**
+ * Allocates and initializes an int32_t array of the given size and returns whether or not the
+ * creation was successful
+ * @param  arr the int32_t** of the array being passed in to be made
+ * @param  Sz  the size of the array
+ * @return bool if the allocation was succesful
+ */
+bool Make_Initialized_Array(int32_t** arr, uint32_t Sz){
+	*arr = (int32_t*) malloc( sizeof(int32_t) * Sz);
+	if(*arr){
+		int i = 0;
+		while( i < Sz ){
+			*arr[i] = INT32_MAX;
+			i++;
+		}
+		return true;
+	}
+	return false;
+};
+
+void CSet_Insert_(CSet* pSet, int32_t val){
+	pSet->Data[pSet->Usage] = val;
+	(pSet->Usage)++;
+};
+
+bool Extend_CSet_Data_Array(CSet* pSet){
+	int32_t* newArr = realloc(pSet->Data, (sizeof(int32_t) * pSet->Capacity * 2));
+	if(!newArr){
+		return false;
+	}
+	pSet->Data = newArr;
+	pSet->Capacity = (pSet->Capacity * 2);
+	return true;
+};
 
