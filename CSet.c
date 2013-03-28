@@ -150,7 +150,7 @@ bool CSet_Insert(CSet* const pSet, int32_t Value){
 		}
 	}
 	else if((pSet->Usage) == (pSet->Capacity - 1)){
-		success = Extend_CSet_Data_Array(pSet, -1);
+		success = Extend_CSet_Data_Array(pSet, (pSet->Capacity * 2));
 		if(success){
 			return CSet_Insert_(pSet, Value);
 		}
@@ -654,7 +654,7 @@ int Get_Insertion_Index_Of(CSet* pSet, int32_t val){
 	if(pSet->Data[index] == val){
 		return DUPLICATE_FLAG;
 	}
-	return index;
+	return pSet->Data[index] < val ? (index + 1) : index;
 };
 
 /**
@@ -685,12 +685,14 @@ int Find_Index_Helper(CSet* pSet, int32_t val){
 };
 
 bool Extend_CSet_Data_Array(CSet* pSet, int32_t size){
-	if(size == -1){
-		size = pSet->Capacity * 2;
-	}
 	int32_t* newArr = realloc(pSet->Data, (sizeof(int32_t) * size));
 	if(!newArr){
 		return false;
+	}
+	int i = pSet->Usage;
+	while(i < size){
+		newArr[i] = INT32_MAX;
+		i++;
 	}
 	pSet->Data = newArr;
 	pSet->Capacity = (pSet->Capacity * 2);

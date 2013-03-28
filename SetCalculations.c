@@ -38,26 +38,26 @@ void Test_Insert(){
 
 	CSet_Insert(&nullSet, 1);
 	CSet_Insert(&set, 1);
-	CSet_Insert(&nullSet, 3);
-	CSet_Insert(&set, 3);
+	CSet_Insert(&nullSet, 66);
+	CSet_Insert(&set, 66);
 	CSet_Insert(&nullSet, 5);
 	CSet_Insert(&set, 5);
 	CSet_Insert(&nullSet, 6);
 	CSet_Insert(&set, 6);
+	CSet_Insert(&nullSet, 89);
+	CSet_Insert(&set, 89);
 	CSet_Insert(&nullSet, 7);
 	CSet_Insert(&set, 7);
-	CSet_Insert(&nullSet, 9);
-	CSet_Insert(&set, 9);
 	CSet_Insert(&nullSet, 11);
 	CSet_Insert(&set, 11);
 	CSet_Insert(&nullSet, 14);
 	CSet_Insert(&set, 14);
-	CSet_Insert(&nullSet, 66);
-	CSet_Insert(&set, 66);
+	CSet_Insert(&nullSet, 3);
+	CSet_Insert(&set, 3);
 	CSet_Insert(&nullSet, 87);
 	CSet_Insert(&set, 87);
-	CSet_Insert(&nullSet, 89);
-	CSet_Insert(&set, 89);
+	CSet_Insert(&nullSet, 9);
+	CSet_Insert(&set, 9);
 
 	assert(set.Data[3] == 6);
 	assert(set.Data[5] == 9);
@@ -263,32 +263,19 @@ void Test_Intersection(){
 	CSet_Init(&setA, 10);
 	CSet_Init(&setB, 10);
 
-	/*CSet_Insert(&setA, 2);
+	CSet_Insert(&setA, 2);
 	CSet_Insert(&setA, 3);
 	CSet_Insert(&setA, 4);
 	CSet_Insert(&setA, 5);
 	CSet_Insert(&setA, 6);
-	CSet_Insert(&setA, 12);*/
-	setA.Data[0] = 2;
-	setA.Data[1] = 3;
-	setA.Data[2] = 4;
-	setA.Data[3] = 5;
-	setA.Data[4] = 6;
-	setA.Data[5] = 12;
+	CSet_Insert(&setA, 12);
 
-	setB.Data[0] = 1;
-	setB.Data[1] = 2;
-	setB.Data[2] = 3;
-	setB.Data[3] = 4;
-	setB.Data[4] = 7;
-	setB.Data[5] = 12;
-
-	/*CSet_Insert(&setB, 2);
+	CSet_Insert(&setB, 2);
 	CSet_Insert(&setB, 1);
 	CSet_Insert(&setB, 12);
 	CSet_Insert(&setB, 3);
 	CSet_Insert(&setB, 4);
-	CSet_Insert(&setB, 7);*/
+	CSet_Insert(&setB, 7);
 
 	CSet_Intersection(&intersection, &setA, &setB);
 
@@ -310,34 +297,19 @@ void Test_Difference(){
 	CSet_Init(&setA, 10);
 	CSet_Init(&setB, 10);
 
-	/*CSet_Insert(&setA, 2);
+	CSet_Insert(&setA, 2);
 	CSet_Insert(&setA, 3);
 	CSet_Insert(&setA, 4);
 	CSet_Insert(&setA, 5);
 	CSet_Insert(&setA, 6);
-	CSet_Insert(&setA, 12);*/
-	setA.Data[0] = 2;
-	setA.Data[1] = 3;
-	setA.Data[2] = 4;
-	setA.Data[3] = 5;
-	setA.Data[4] = 6;
-	setA.Data[5] = 12;
-	setA.Usage = 6;
+	CSet_Insert(&setA, 12);
 
-	setB.Data[0] = 1;
-	setB.Data[1] = 2;
-	setB.Data[2] = 3;
-	setB.Data[3] = 4;
-	setB.Data[4] = 7;
-	setB.Data[5] = 12;
-	setB.Usage = 6;
-
-	/*CSet_Insert(&setB, 2);
+	CSet_Insert(&setB, 2);
 	CSet_Insert(&setB, 1);
 	CSet_Insert(&setB, 12);
 	CSet_Insert(&setB, 3);
 	CSet_Insert(&setB, 4);
-	CSet_Insert(&setB, 7);*/
+	CSet_Insert(&setB, 7);
 
 	CSet_Difference(&diff, &setA, &setB);
 
@@ -353,7 +325,7 @@ int main(int argc, char* argv[]){
 	printf("Started to do set calculations...\n");
 	Test_Init();
 	Test_Load();
-	Test_Insert(); //THIS DOES NOT WORK WHEN YOU INSERT OUT OF ORDER
+	Test_Insert(); 
 	Test_Copy();
 	Test_Contains();
 	Test_Remove();
