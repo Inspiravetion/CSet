@@ -1,4 +1,6 @@
 #include "CSet.h"
+#include <stdlib.h>
+#include <math.h>
 
 // CSet provides an implementation of a set type for storing signed
 // 32-bit integer values (int32_t).
@@ -37,13 +39,17 @@ typedef struct _CSet CSet;*/
 
 //Global Declaration
 #define DEFAULT_CAPACITY 10
+#define DUPLICATE_FLAG -1
 
 //Internal Helper Declarations
 void CSet_Init_Empty(CSet* const pSet);
+void Copy_Elements(uint32_t* source, uint32_t* target, uint32_t Sz);
+bool CSet_Insert_(CSet* pSet, int32_t val);
 bool CSet_Init_(CSet* const pSet, uint32_t Sz);
 bool Make_Initialized_Array(int32_t** arr, uint32_t Sz);
-bool Extend_CSet_Data_Array(CSet* pSet);
-void CSet_Insert_(CSet* pSet, int32_t val);
+bool Extend_CSet_Data_Array(CSet* pSet, int32_t size);
+int Get_Insertion_Index_Of(CSet* pSet, int32_t val);
+int Find_Index_Helper(CSet* pSet, int32_t val);
 
 /**
  * Initializes an empty pSet object, with capacity Sz.
@@ -97,19 +103,23 @@ bool CSet_Init(CSet* const pSet, uint32_t Sz){
  *    true if successful, false otherwise
  */
 bool CSet_Load(CSet* const pSet, uint32_t Sz, const int32_t* const Data, uint32_t DSz){
+	/**
+	 * MAKE SURE TO CHECK THAT THE VALUE IS NOT ALREADY IN THE SET!!!
+	 * might have to sort data TODO:
+	 */
 	int32_t* temp;
 	int i = 0;
 	bool success = Make_Initialized_Array(&temp, Sz);
 	if(!success){
 		return false;
 	}
+	if(pSet->Data != NULL){
+		free(pSet->Data);
+	}
 	pSet->Capacity = Sz;
 	pSet->Usage    = DSz;
 	pSet->Data     = temp;
-	while(i < DSz){
-		pSet->Data[i] = Data[i];
-		i++;
-	}
+	Copy_Elements(Data, pSet->Data, DSz);
 	return true;
 };
 
@@ -130,29 +140,23 @@ bool CSet_Load(CSet* const pSet, uint32_t Sz, const int32_t* const Data, uint32_
  *    true if successful, false otherwise
  */
 bool CSet_Insert(CSet* const pSet, int32_t Value){
-	/**
-	 * MAKE SURE TO CHECK THAT THE VALUE IS NOT ALREADY IN THE SET!!!
-	 */
 	bool success;
 	if(!(pSet->Data)){
 		if((success = CSet_Init(pSet, DEFAULT_CAPACITY))){
-			CSet_Insert_(pSet, Value);
-			return true;
+			return CSet_Insert_(pSet, Value);
 		}
 		else{
 			return false;
 		}
 	}
 	else if((pSet->Usage) == (pSet->Capacity - 1)){
-		success = Extend_CSet_Data_Array(pSet);
+		success = Extend_CSet_Data_Array(pSet, -1);
 		if(success){
-			CSet_Insert_(pSet, Value);
-			return true;
+			return CSet_Insert_(pSet, Value);
 		}
 		return false;
 	}
-	CSet_Insert_(pSet, Value);
-	return true;
+	return CSet_Insert_(pSet, Value);
 };
 
 /**
@@ -175,7 +179,30 @@ bool CSet_Insert(CSet* const pSet, int32_t Value){
  * Returns:
  *    true if successful, false otherwise
  */
-bool CSet_Copy(CSet* const pTarget, const CSet* const pSource);
+bool CSet_Copy(CSet* const pTarget, const CSet* const pSource){
+	if(pTarget->Data == NULL){
+		if(!CSet_Init(pTarget, pSource->Capacity)){
+			return false;
+		}
+	}
+	if(pTarget->Capacity < pSource->Capacity){
+		bool success = Extend_CSet_Data_Array(pTarget, pSource->Capacity);
+		if(!success){
+			return false;
+		}
+	}
+	else if(pTarget->Capacity > pSource->Capacity){
+		free(pTarget->Data);
+		bool success = Make_Initialized_Array(&(pTarget->Data), pSource->Capacity);
+		if(!success){
+			return false;
+		}
+	}
+	Copy_Elements(pSource->Data, pTarget->Data, pSource->Usage);
+	pTarget->Usage = pSource->Usage;
+	pTarget->Capacity = pSource->Capacity;
+	return true;
+};
 
 /**
  * Determines if Value belongs to a pSet object.
@@ -188,7 +215,13 @@ bool CSet_Copy(CSet* const pTarget, const CSet* const pSource);
  * Returns:
  *    true if Value belongs to *pSet, false otherwise
  */
-bool CSet_Contains(const CSet* const pSet, int32_t Value);
+bool CSet_Contains(const CSet* const pSet, int32_t Value){
+	if(pSet->Data == NULL){
+		return false;
+	}
+	int index = Find_Index_Helper(pSet, Value);
+	return (pSet->Data[index] == Value);
+};
 
 /**
  * Removes Value from a pSet object.
@@ -206,7 +239,20 @@ bool CSet_Contains(const CSet* const pSet, int32_t Value);
  *       *pSet is unchanged
  * Returns:
  *    true if Value was removed, false otherwise
- */bool CSet_Remove(CSet* const pSet, int32_t Value);
+ */ 
+bool CSet_Remove(CSet* const pSet, int32_t Value){
+	int index = Find_Index_Helper(pSet, Value);
+	if(pSet->Data[index] == Value){
+		while(index < (pSet->Usage -1)){
+			pSet->Data[index] = pSet->Data[index + 1];
+			index++;
+		}
+		pSet->Data[pSet->Usage - 1] = INT32_MAX;
+		pSet->Usage--;
+		return true;
+	}
+	return false;
+};
 
 /**
  * Determines if two CSet objects contain the same elements.
@@ -220,7 +266,22 @@ bool CSet_Contains(const CSet* const pSet, int32_t Value);
  * Returns:
  *    true if sets contain same elements, false otherwise
  */
-bool CSet_Equals(const CSet* const pA, const CSet* const pB);
+bool CSet_Equals(const CSet* const pA, const CSet* const pB){
+	if(!pA->Data && !pB->Data){
+		return true;
+	}
+	else if(!pA->Data || !pB->Data || (pA->Usage != pB->Usage)){
+		return false;
+	}
+	int i = 0;
+	while(i < pA->Usage){
+		if(pA->Data[i] != pB->Data[i]){
+			return false;
+		}
+		i++;
+	}
+	return true;
+};
 
 /**
  * Determines if one CSet object is a subset of another.
@@ -234,7 +295,19 @@ bool CSet_Equals(const CSet* const pA, const CSet* const pB);
  * Returns:
  *    true if *pB contains every element of *pA, false otherwise
  */
-bool CSet_isSubsetOf(const CSet* const pA, const CSet* const pB);
+bool CSet_isSubsetOf(const CSet* const pA, const CSet* const pB){
+	if(pA->Data == NULL || pB->Data == NULL || pA->Usage > pB->Usage){
+		return false;
+	}
+	int i = 0, smallInd = 0;
+	while(i < pB->Usage){
+		if(pB->Data[i] == pA->Data[smallInd]){
+			smallInd++;
+		}
+		i++;
+	}
+	return (smallInd == pA->Usage);
+};
 
 /**
  * Sets *pUnion to be the union of the sets *pA and *pB.
@@ -256,7 +329,72 @@ bool CSet_isSubsetOf(const CSet* const pA, const CSet* const pB);
  * Returns:
  *    true if the union is successfully created; false otherwise
  */
-bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB);
+bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB){
+	if (!CSet_Init(pUnion, (pA->Capacity + pB->Capacity))){
+		return false;
+	}
+	int i = 0, a = 0, b = 0;
+	int maxUse = pA->Usage > pB->Usage ? pA->Usage : pB->Usage;
+	bool success;
+	while(i < maxUse){
+		if((pA->Data[a] > pB->Data[b])){
+			if(b == (pB->Usage - 1)){
+				success = CSet_Insert(pUnion, pB->Data[b]);
+				if(!success){
+					return false;
+				}
+				while(a < pA->Usage){
+					success = CSet_Insert(pUnion, pA->Data[a]);
+					if(!success){
+						return false;
+					}
+					a++;
+				}
+				break;
+			}
+			else{
+				success = CSet_Insert(pUnion, pB->Data[b]);
+				if(!success){
+					return false;
+				}
+				b++;
+			}
+		}
+		else if((pA->Data[a] < pB->Data[b])){
+			if(a == (pA->Usage - 1)){
+				success = CSet_Insert(pUnion, pA->Data[a]);
+				if(!success){
+					return false;
+				}
+				while(b < pB->Usage){
+					success = CSet_Insert(pUnion, pB->Data[b]);
+					if(!success){
+					return false;
+				}
+					b++;
+				}
+				break;
+			}
+			else{
+				success = CSet_Insert(pUnion, pA->Data[a]);
+				if(!success){
+					return false;
+				}
+				a++;
+			}
+		}
+		else{
+			success = CSet_Insert(pUnion, pA->Data[a]);
+			if(!success){
+					return false;
+				}
+			a++;
+			b++;
+		}
+		i++;
+	} 
+	return true;
+};
 
 /**
  * Sets *pIntersection to be the intersection of the sets *pA and *pB.
@@ -277,7 +415,36 @@ bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB);
  * Returns:
  *    true if the intersection is successfully created; false otherwise
  */
-bool CSet_Intersection(CSet* const pIntersection, const CSet* const pA, const CSet* const pB);
+bool CSet_Intersection(CSet* const pIntersection, const CSet* const pA, const CSet* const pB){
+	if (!CSet_Init(pIntersection, pA->Capacity > pB->Capacity ? pA->Capacity : pB->Capacity)){
+		return false;
+	}
+	bool done = false, success;
+	int a = 0, b = 0;
+	while(!done){
+		if((pA->Data[a] > pB->Data[b])){
+			if(b == (pB->Usage - 1)){
+				done = true;
+			}
+			b++;
+		}
+		else if((pA->Data[a] < pB->Data[b])){
+			if(a == (pA->Usage - 1)){
+				done = true;
+			}
+			a++;
+		}
+		else{
+			success = CSet_Insert(pIntersection, pA->Data[a]);
+			if(!success){
+				return false;
+			}
+			a++;
+			b++;
+		}
+	}
+	return true;
+};
 
 /**
  * Sets *pIntersection to be the intersection of the sets *pA and *pB.
@@ -298,7 +465,50 @@ bool CSet_Intersection(CSet* const pIntersection, const CSet* const pA, const CS
  * Returns:
  *    true if the intersection is successfully created; false otherwise
  */
-bool CSet_Difference(CSet* const pDifference, const CSet* const pA, const CSet* const pB);
+bool CSet_Difference(CSet* const pDifference, const CSet* const pA, const CSet* const pB){
+	if (!CSet_Init(pDifference, pA->Capacity)){
+		return false;
+	}
+	bool done = false, success;
+	int a = 0, b = 0;
+	while(!done){
+		if((pA->Data[a] > pB->Data[b])){
+			if(!(b == (pB->Usage - 1))){
+				b++;
+			}
+			else{
+				while(a < pA->Usage){
+					success = CSet_Insert(pDifference, pA->Data[a]);
+					if(!success){
+						return false;
+					}
+					a++;
+				}
+				done = true;
+			}
+		}
+		else if((pA->Data[a] < pB->Data[b])){
+			if(a == (pA->Usage - 1)){
+				done = true;
+			}
+			success = CSet_Insert(pDifference, pA->Data[a]);
+			if(!success){
+				return false;
+			}
+			a++;
+		}
+		else{
+			if(a == (pA->Usage - 1)){
+				done = true;
+			}
+			else{
+				a++;
+				b++;
+			}
+		}
+	}
+	return true;
+}
 
 /**
  *  Reports the number of elements in a pSet object.
@@ -310,7 +520,12 @@ bool CSet_Difference(CSet* const pDifference, const CSet* const pA, const CSet* 
  *  Returns:
  *     pSet->Usage
  */
-uint32_t CSet_Size(const CSet* const pSet);
+uint32_t CSet_Size(const CSet* const pSet){
+	if(pSet->Data == NULL){
+		return 0;
+	}
+	return pSet->Usage;
+}
 
 /**
  *  Determines whether a CSet object is empty.
@@ -322,7 +537,9 @@ uint32_t CSet_Size(const CSet* const pSet);
  *  Returns:
  *     true if pSet->Usage == 0, false otherwise
  */
-bool CSet_isEmpty(const CSet* const pSet);
+bool CSet_isEmpty(const CSet* const pSet){
+	return (pSet->Data == NULL || pSet->Usage == 0);
+}
 
 /**
  *  Determines whether a CSet object is full.
@@ -334,7 +551,10 @@ bool CSet_isEmpty(const CSet* const pSet);
  *  Returns:
  *     true if pSet->Usage == pSet->Capacity, false otherwise
  */
-bool CSet_isFull(const CSet* const pSet);
+bool CSet_isFull(const CSet* const pSet){
+	return pSet->Data != NULL && pSet->Usage == pSet->Capacity;
+};
+
 
 /**
  *  Removes all elements from a CSet object.
@@ -345,13 +565,18 @@ bool CSet_isFull(const CSet* const pSet);
  *     *pSet contains no elements
  *     *pSet satisfies the CSet contract
  */
-void CSet_makeEmpty(CSet* const pSet);
+void CSet_makeEmpty(CSet* const pSet){
+	free(pSet->Data);
+	pSet->Usage = 0;
+	pSet->Capacity = 0;
+	pSet->Data = NULL;
+}
 
 
 //Internal(Private) helpers====================================================
 
 /**
- * Initializes a Cset to be empty 
+ * Initializes a CSet to be empty 
  * @param pSet the passed in CSet to be altered
  */
 void CSet_Init_Empty(CSet* const pSet){
@@ -385,25 +610,85 @@ bool CSet_Init_(CSet* const pSet, uint32_t Sz){
  * @return bool if the allocation was succesful
  */
 bool Make_Initialized_Array(int32_t** arr, uint32_t Sz){
-	*arr = (int32_t*) malloc( sizeof(int32_t) * Sz);
-	if(*arr){
+	int32_t* temp;
+	temp = (int32_t*) malloc( sizeof(int32_t) * Sz);
+	if(temp){
 		int i = 0;
 		while( i < Sz ){
-			*arr[i] = INT32_MAX;
+			temp[i] = INT32_MAX;
 			i++;
 		}
+		*arr = temp;
 		return true;
 	}
 	return false;
 };
 
-void CSet_Insert_(CSet* pSet, int32_t val){
-	pSet->Data[pSet->Usage] = val;
+bool CSet_Insert_(CSet* pSet, int32_t val){
+	int insertInd = Get_Insertion_Index_Of(pSet, val);
+	if (insertInd == DUPLICATE_FLAG){
+		return false;
+	}
+	int32_t currVal = val;
+	int32_t temp;
+	while(insertInd < (pSet->Usage + 1)){
+		temp = pSet->Data[insertInd];
+		pSet->Data[insertInd] = currVal;
+		currVal = temp;
+		insertInd++;
+	}
 	(pSet->Usage)++;
+	return true;
 };
 
-bool Extend_CSet_Data_Array(CSet* pSet){
-	int32_t* newArr = realloc(pSet->Data, (sizeof(int32_t) * pSet->Capacity * 2));
+/**
+ * Uses a Binary search to either find the offset of where the element should be or signify that
+ * it should not be added because it is already in the set
+ * @param  pSet the passed in set to add the element to
+ * @param  val the passed in value to add 
+ * @return int the index of where the value should be placed in the set or DUPLICATE_FLAG if 
+ * it already exists.
+ */
+int Get_Insertion_Index_Of(CSet* pSet, int32_t val){
+	int index = Find_Index_Helper(pSet, val);
+	if(pSet->Data[index] == val){
+		return DUPLICATE_FLAG;
+	}
+	return index;
+};
+
+/**
+ * Calculates the index of a value in a CSet returning either the 
+ * index at which the value is in the CSet->Data array or where it 
+ * should go in that array.
+ * @param  pSet a pointer to a CSet
+ * @param  val  a int32_t value to search for
+ * @return int the index of where the val is or should be
+ */
+int Find_Index_Helper(CSet* pSet, int32_t val){
+	int bottom = 0;
+	int top = pSet->Usage;
+	int currInd;
+	while(top >= bottom){
+		currInd = (bottom + ((top - bottom) / 2));
+		if(pSet->Data[currInd] == val){
+			return currInd;
+		}
+		else if(pSet->Data[currInd] > val){
+			top = currInd - 1;
+		}
+		else{
+			bottom = currInd + 1;
+		}
+	}
+	return currInd;
+};
+
+bool Extend_CSet_Data_Array(CSet* pSet, int32_t size){
+	if(size == -1){
+		size = pSet->Capacity * 2;
+	}
+	int32_t* newArr = realloc(pSet->Data, (sizeof(int32_t) * size));
 	if(!newArr){
 		return false;
 	}
@@ -411,4 +696,12 @@ bool Extend_CSet_Data_Array(CSet* pSet){
 	pSet->Capacity = (pSet->Capacity * 2);
 	return true;
 };
+
+void Copy_Elements(uint32_t* source, uint32_t* target, uint32_t Sz){
+		int i = 0;
+		while(i < Sz){
+			target[i] = source[i];
+			i++;
+		}
+	}
 
