@@ -1,6 +1,5 @@
 #include "CSet.h"
 #include <stdlib.h>
-#include <math.h>
 
 // CSet provides an implementation of a set type for storing signed
 // 32-bit integer values (int32_t).
@@ -43,7 +42,7 @@ typedef struct _CSet CSet;*/
 
 //Internal Helper Declarations
 void CSet_Init_Empty(CSet* const pSet);
-void Copy_Elements(uint32_t* source, uint32_t* target, uint32_t Sz);
+void Copy_Elements(const int32_t* const source, uint32_t* target, uint32_t Sz);
 bool CSet_Insert_(CSet* pSet, int32_t val);
 bool CSet_Init_(CSet* const pSet, uint32_t Sz);
 bool Make_Initialized_Array(int32_t** arr, uint32_t Sz);
@@ -103,10 +102,6 @@ bool CSet_Init(CSet* const pSet, uint32_t Sz){
  *    true if successful, false otherwise
  */
 bool CSet_Load(CSet* const pSet, uint32_t Sz, const int32_t* const Data, uint32_t DSz){
-	/**
-	 * MAKE SURE TO CHECK THAT THE VALUE IS NOT ALREADY IN THE SET!!!
-	 * might have to sort data TODO:
-	 */
 	int32_t* temp;
 	int i = 0;
 	bool success = Make_Initialized_Array(&temp, Sz);
@@ -241,6 +236,9 @@ bool CSet_Contains(const CSet* const pSet, int32_t Value){
  *    true if Value was removed, false otherwise
  */ 
 bool CSet_Remove(CSet* const pSet, int32_t Value){
+	if(pSet->Data == NULL){
+		return false;
+	}
 	int index = Find_Index_Helper(pSet, Value);
 	if(pSet->Data[index] == Value){
 		while(index < (pSet->Usage -1)){
@@ -296,8 +294,17 @@ bool CSet_Equals(const CSet* const pA, const CSet* const pB){
  *    true if *pB contains every element of *pA, false otherwise
  */
 bool CSet_isSubsetOf(const CSet* const pA, const CSet* const pB){
-	if(pA->Data == NULL || pB->Data == NULL || pA->Usage > pB->Usage){
+	if(pA->Usage > pB->Usage){
 		return false;
+	}
+	if(pA->Data == NULL && pB->Data == NULL){
+		return true;
+	}
+	if(pB->Data == NULL){
+		return false;
+	}
+	if(pA->Data == NULL){
+		return true;
 	}
 	int i = 0, smallInd = 0;
 	while(i < pB->Usage){
@@ -330,13 +337,30 @@ bool CSet_isSubsetOf(const CSet* const pA, const CSet* const pB){
  *    true if the union is successfully created; false otherwise
  */
 bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB){
-	if (!CSet_Init(pUnion, (pA->Capacity + pB->Capacity))){
+	if((pA->Data == NULL && pB->Data == NULL) || //shouldnt return false for these...should return the opposite 
+		!CSet_Init(pUnion, (pA->Capacity + pB->Capacity))){
 		return false;
+	}
+	if(pA->Data == NULL){
+		int i = 0;
+		while(i < pB->Usage){
+			CSet_Insert(pUnion, pB->Data[i]);
+			i++;
+		}
+		return true;
+	}
+	if(pB->Data == NULL){
+		int i = 0;
+		while(i < pA->Usage){
+			CSet_Insert(pUnion, pA->Data[i]);
+			i++;
+		}
+		return true;
 	}
 	int i = 0, a = 0, b = 0;
 	int maxUse = pA->Usage > pB->Usage ? pA->Usage : pB->Usage;
-	bool success;
-	while(i < maxUse){
+	bool success, done = false;
+	while(!done){
 		if((pA->Data[a] > pB->Data[b])){
 			if(b == (pB->Usage - 1)){
 				success = CSet_Insert(pUnion, pB->Data[b]);
@@ -350,7 +374,7 @@ bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB){
 					}
 					a++;
 				}
-				break;
+				done = true;
 			}
 			else{
 				success = CSet_Insert(pUnion, pB->Data[b]);
@@ -373,7 +397,7 @@ bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB){
 				}
 					b++;
 				}
-				break;
+				done = true;
 			}
 			else{
 				success = CSet_Insert(pUnion, pA->Data[a]);
@@ -387,11 +411,15 @@ bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB){
 			success = CSet_Insert(pUnion, pA->Data[a]);
 			if(!success){
 					return false;
-				}
-			a++;
-			b++;
+			}
+			if((a == (pA->Usage - 1)) && (b == (pB->Usage - 1))){
+				done = true;
+			}
+			else{
+				a++;
+				b++;
+			}
 		}
-		i++;
 	} 
 	return true;
 };
@@ -416,7 +444,8 @@ bool CSet_Union(CSet* const pUnion, const CSet* const pA, const CSet* const pB){
  *    true if the intersection is successfully created; false otherwise
  */
 bool CSet_Intersection(CSet* const pIntersection, const CSet* const pA, const CSet* const pB){
-	if (!CSet_Init(pIntersection, pA->Capacity > pB->Capacity ? pA->Capacity : pB->Capacity)){
+	if (pA->Data == NULL || pB->Data == NULL || 
+		!CSet_Init(pIntersection, pA->Capacity > pB->Capacity ? pA->Capacity : pB->Capacity)){
 		return false;
 	}
 	bool done = false, success;
@@ -466,8 +495,16 @@ bool CSet_Intersection(CSet* const pIntersection, const CSet* const pA, const CS
  *    true if the intersection is successfully created; false otherwise
  */
 bool CSet_Difference(CSet* const pDifference, const CSet* const pA, const CSet* const pB){
-	if (!CSet_Init(pDifference, pA->Capacity)){
+	if (pA->Data == NULL || !CSet_Init(pDifference, pA->Capacity)){
 		return false;
+	}
+	if(pB->Data == NULL){
+		int i = 0;
+		while(i < pA->Usage){
+			CSet_Insert(pDifference, pA->Data[i]);
+			i++;
+		}
+		return true;
 	}
 	bool done = false, success;
 	int a = 0, b = 0;
@@ -699,7 +736,7 @@ bool Extend_CSet_Data_Array(CSet* pSet, int32_t size){
 	return true;
 };
 
-void Copy_Elements(uint32_t* source, uint32_t* target, uint32_t Sz){
+void Copy_Elements(const int32_t* const source, uint32_t* target, uint32_t Sz){
 		int i = 0;
 		while(i < Sz){
 			target[i] = source[i];
